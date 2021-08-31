@@ -103,7 +103,7 @@ Place the folder 'ServerMachineDataset' at the location <root-of-the-project>/da
 Put all the datasets in the data/raw/ directory. 
 
 ```bash
-git clone https://github.com/astha-chem/multivar-ts-ano.git
+git clone https://github.com/astha-chem/mvts-ano-eval.git
 conda create -n mvtsenv python=3.6
 source activate mvtsenv
 python3 -m pip3 install --user --upgrade pip
