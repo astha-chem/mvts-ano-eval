@@ -1,9 +1,11 @@
 
 # Anomaly Detection on Time Series: An Evaluation of Deep Learning Methods
 
-The goal of this repository is to evaluate multivariate time-series anomaly detection algorithms on a common set of datasets. This repository is forked from https://github.com/KDD-OpenSource/DeepADoTS
+The goal of this repository is to evaluate multivariate time-series anomaly detection algorithms on a common set of datasets discussed in the paper:
 
-Credit for the initial implementation goes to them. 
+A. Garg, W. Zhang, J. Samaran, R. Savitha and C. -S. Foo, "An Evaluation of Anomaly Detection and Diagnosis in Multivariate Time Series," in IEEE Transactions on Neural Networks and Learning Systems, doi: 10.1109/TNNLS.2021.3105827.
+https://ieeexplore.ieee.org/document/9525836
+
 
 ## Implemented Algorithms
 
@@ -126,6 +128,7 @@ python3 metrics_expts.py
 
 
 ## Credits
+This repository is forked from https://github.com/KDD-OpenSource/DeepADoTS
 [Base implementation for AutoEncoder, LSTM-ED](https://github.com/KDD-OpenSource/DeepADoTS)
 [Base implementation for Omni-anomaly] (https://github.com/NetManAIOps/OmniAnomaly)  
 [Base implementation for VAE-LSTM](https://github.com/TimyadNyda/Variational-Lstm-Autoencoder)
