@@ -131,7 +131,7 @@ python3 metrics_expts.py
 ## Credits
 This repository is forked from https://github.com/KDD-OpenSource/DeepADoTS
 [Base implementation for AutoEncoder, LSTM-ED](https://github.com/KDD-OpenSource/DeepADoTS)
-[Base implementation for Omni-anomaly] (https://github.com/NetManAIOps/OmniAnomaly)  
+[Base implementation for Omni-anomaly](https://github.com/NetManAIOps/OmniAnomaly)  
 [Base implementation for VAE-LSTM](https://github.com/TimyadNyda/Variational-Lstm-Autoencoder)
 [Base implementation for MSCRED 1](https://github.com/Zhang-Zhi-Jie/Pytorch-MSCRED) [Base implementation for MSCRED 2](https://github.com/SKvtun/MSCRED-Pytorch)
 [TCN module](https://github.com/locuslab/TCN)
