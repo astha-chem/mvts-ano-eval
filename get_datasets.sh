@@ -31,9 +31,11 @@ rm -r data/raw/smd
 # SKAB
 mkdir data/raw/skab && cd data/raw/skab
 curl -L https://github.com/waico/SKAB/tarball/master | tar xz --strip-components=1
+# remove docs  LICENSE  notebooks  README.md  utils
 rm -r docs
 rm -r notebooks
 rm -r utils
-rm -v !("data") && mv data/* ../skab
+rm LICENSE
+rm README.md
+mv data/* ../skab
 rm -r data/
-
