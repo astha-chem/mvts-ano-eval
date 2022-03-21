@@ -77,7 +77,7 @@ location: <root-of-the-project>/data/raw/wadi/raw
 
 ### Damadics
 This data set contains data from actuators collected over several days at the Lublin Sugar Factory.
-Data can be downloaded from this [website](http://diag.mchtr.pw.edu.pl/damadics/), each file contains the data acquired 
+Data can be downloaded from this [website](https://iair.mchtr.pw.edu.pl/Damadics), each file contains the data acquired 
 during one day and the data from October 29th to November 22, 2001 should be downloaded and placed at the following 
 location: <root-of-the-project>/data/raw/damadics/raw
 
