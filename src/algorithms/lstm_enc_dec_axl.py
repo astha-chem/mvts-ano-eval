@@ -122,7 +122,31 @@ class LSTMED(Algorithm, PyTorchUtils):
         self.additional_params["val_loss_per_epoch"] = val_loss
         self.additional_params["val_reconstr_errors"] = val_reconstr_errors
         self.additional_params["best_val_loss"] = best_val_loss
-
+    
+    def fit_sequences(self, sequences):
+        train_loader, train_val_loader = get_train_data_loaders(sequences, batch_size=self.batch_size,
+                                                                splits=[1 - self.train_val_percentage,
+                                                                        self.train_val_percentage], seed=self.seed)
+        self.model = LSTMEDModule(sequences.shape[-1], self.hidden_size, self.n_layers, self.use_bias, self.dropout,
+                                  seed=self.seed, gpu=self.gpu)
+        self.model, train_loss, val_loss, val_reconstr_errors, best_val_loss = \
+            fit_with_early_stopping(train_loader, train_val_loader, self.model, patience=self.patience,
+                                    num_epochs=self.num_epochs, lr=self.lr, last_t_only=self.last_t_only,
+                                    ret_best_val_loss=True)
+    @torch.no_grad()
+    def predict_sequences(self, sequences):
+        test_loader = DataLoader(dataset=sequences, batch_size=self.batch_size, drop_last=False, pin_memory=True,
+                                 shuffle=False)
+        reconstr_errors, outputs_array = predict_test_scores(self.model, test_loader, latent=False,
+                                                             return_output=True)
+        predictions_dic = {'score_t': None,
+                           'score_tc': None,
+                           'error_t': None,
+                           'error_tc': reconstr_errors,
+                           'recons_tc': outputs_array,
+                           }
+        return predictions_dic
+        
     def get_val_loss(self):
         try:
             val_loss = self.additional_params["best_val_loss"]
