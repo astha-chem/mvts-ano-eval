@@ -2,17 +2,17 @@ from sklearn.metrics import classification_report
 from my_data_functions import load_data_partial, get_results, load_edBB_all
 from src.algorithms import AutoEncoder
 from src.algorithms.algorithm_utils import get_sub_seqs
-from my_experiments_mvts import get_normalized_scores, get_fitted_scores, collect_results, setup_out_dir 
+# from my_experiments_mvts import get_normalized_scores, get_fitted_scores, collect_results, setup_out_dir 
 import numpy as np
 import pandas as pd
 
-# from src.algorithms.algorithm_utils import fit_univar_distr
-# from src.evaluation.evaluation_utils import get_scores_channelwise, threshold_and_predict
+from src.algorithms.algorithm_utils import fit_univar_distr
+from src.evaluation.evaluation_utils import get_scores_channelwise, threshold_and_predict
 # from datetime import datetime
-# import os
-# from sklearn.metrics import recall_score, classification_report
-# import logging
-# from src.datasets.dataset import get_events
+import os
+from sklearn.metrics import recall_score, classification_report
+import logging
+from src.datasets.dataset import get_events
 
 # Global configs
 body_parts = ['full', 'upper']
@@ -25,6 +25,46 @@ batch_size = 16
 learning_rate = 0.0001
 seed = 0
 n_data_folds = 3
+
+
+def get_normalized_scores(train_scores, test_scores):
+    mean_scores = np.mean(train_scores, axis=0)
+    scores = test_scores - mean_scores
+    scores = np.sqrt(np.mean(scores**2, axis=1))
+    return scores
+
+def get_fitted_scores(error_tc_train, error_tc_test, distr_name='univar_gaussian'):
+    distr_params = [fit_univar_distr(error_tc_train[:, i], distr=distr_name) for i in range(error_tc_train.shape[1])]
+    score_t_train, _, score_t_test, score_tc_train, _, score_tc_test = get_scores_channelwise(distr_params, train_raw_scores=error_tc_train,
+                                       val_raw_scores=None, test_raw_scores=error_tc_test,
+                                       drop_set=set([]), logcdf=True)
+    return score_t_train, score_t_test
+
+def collect_results(score_t_train, score_t_test, y_test, thres_method='tail_prob'):
+    test_anom_frac = (np.sum(y_test)) / len(y_test)
+    true_events = get_events(y_test)
+    logger = None
+    composite_best_f1 = True
+    thres_config_dict = {'tail_prob':{"tail_prob": 4}}
+    logger = logging.getLogger('test')
+    opt_thres, pred_labels, avg_prec, auroc = threshold_and_predict(score_t_test, y_test, true_events=true_events,
+                                                                        logger=logger,
+                                                                        test_anom_frac=test_anom_frac,
+                                                                        thres_method=thres_method,
+                                                                        point_adjust=False,
+                                                                        score_t_train=score_t_train,
+                                                                        thres_config_dict=thres_config_dict,
+                                                                        return_auc=True,
+                                                                        composite_best_f1=composite_best_f1)
+    acc = recall_score(y_test, pred_labels,labels=[1])
+    print(f"APS: {avg_prec:0.3f}, AUROC: {auroc:0.3f}, {thres_method} ACC: {acc:0.3f}")
+    return avg_prec, auroc, acc
+
+def setup_out_dir(dataset_name, model_name, feature_type, folder_idx='all'):
+    path = f'my_trained_models/{dataset_name}/{model_name}/{feature_type}/{folder_idx}/'
+    if not os.path.exists(path):
+        os.makedirs(path)
+    return path
 
 def get_model(model_name,features_dim, out_dir=None):
 
