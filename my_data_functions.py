@@ -23,16 +23,16 @@ def load_edBB_all(feature_type, body_part, normals_only=True):
 
 def load_data_partial(dataset, folder_idx, feature_type, body_part, train_ratio=0.3, return_filenames=False):
 
-    base_path = 'E:/Atabay/Datasets/edBB/Side/_data'
+    base_path = './edBB/Side/_data'
     if dataset == 'MyDataset':
-        base_path = f'E:/Atabay/Datasets/MyDataset/{folder_idx:02d}_*'
-        base_path = glob.glob(base_path)[0]
+        base_path = f'./data/MyDataset/{folder_idx:02d}'
+        # base_path = glob.glob(base_path)[0]
 
     if feature_type == 'original':
         #load skeletons
         coordinates_path = base_path + f'/coordinates_movnet/{folder_idx:02d}.csv'
         if dataset == 'MyDataset':
-            coordinates_path = base_path + '/coordinates_movnet/01.csv'
+            coordinates_path = base_path + '/coordinates_movnet.csv'
         time_series = pd.read_csv(coordinates_path, header=None)
         time_series = time_series.iloc[:,1:]
         if body_part == 'upper':
@@ -127,6 +127,7 @@ def test(dataset, feature_type):
 
 if __name__ == '__main__':
     # test('MyDataset','distance')
-    x, y = load_edBB_all('original','upper')   
+    # x, y = load_edBB_all('original','upper')  
+    x, y = load_data_partial('MyDataset',1,'original','full',1.0) 
     print('X:',x.shape,'y:',y.shape)
  
