@@ -40,7 +40,7 @@ def load_data_partial(dataset, folder_idx, feature_type, body_part, train_ratio=
     else:
         features_path = base_path + f'/angle_distance_features/{folder_idx:02d}.csv'
         if dataset == 'MyDataset':
-            features_path = base_path + f'/features/angle_distance_features.csv'
+            features_path = base_path + f'/angle_distance_features.csv'
         data = pd.read_csv(features_path, header=None)
         data = data.iloc[:,1:]
         if feature_type == 'angle_distance':
