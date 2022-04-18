@@ -215,7 +215,7 @@ def run_all_experiments(dataset_name, model_names, distr_name, algorithm, mode):
             aps, roc, acc = experiments_on_dataset(dataset_name, model_name, feature_name, distr_name, algorithm, edBB_pretrain, edBB_finetune)
             results.loc[model_name, feature_name] = [acc, aps, roc]
     time_now = datetime.utcnow().strftime('%Y_%m_%d_%H_%M_%S')
-    results.to_csv(f'mvts_results_{time_now}.csv')
+    results.to_csv(f'./my_results/mvts_results_{time_now}.csv')
     print(f'results are saved to "results_{time_now}.csv"')
 
 if __name__ == '__main__':
