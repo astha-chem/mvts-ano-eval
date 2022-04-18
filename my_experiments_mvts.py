@@ -1,7 +1,6 @@
 from sklearn.metrics import classification_report
 from my_data_functions import load_data_partial, get_results, load_edBB_all
-from my_autoencoder import AutoEncoder
-# from src.algorithms import AutoEncoder
+from src.algorithms import AutoEncoder
 from src.algorithms.algorithm_utils import get_sub_seqs
 from my_experiments_mvts import get_normalized_scores, get_fitted_scores, collect_results, setup_out_dir 
 import numpy as np
@@ -166,6 +165,6 @@ if __name__ == '__main__':
     distr_names = ['normalized_error', 'univar_gaussian']#, 'univar_lognormal', 'univar_lognorm_add1_loc0', 'chi']
     thresh_methods = ['top_k_time']#, 'best_f1_test', 'tail_prob']
     dataset_name, model_name, folder_idx, feature_type = datasets[1], model_names[0], 1, feature_types[2]
-    # experiment_on_folder(dataset_name, model_name, folder_idx, feature_type=feature_type, score_distr_name=distr_names[0])
+    experiment_on_folder(dataset_name, model_name, folder_idx, feature_type=feature_type, score_distr_name=distr_names[0])
     # experiments_on_dataset(dataset_name, model_name, feature_type, distr_names[1], algorithm='default')
-    experiments_on_dataset(dataset_name, model_name, feature_type, distr_names[1], algorithm='algo_2')
+    # experiments_on_dataset(dataset_name, model_name, feature_type, distr_names[1], algorithm='algo_2')
