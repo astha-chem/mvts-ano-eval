@@ -8,7 +8,7 @@ import pandas as pd
 
 from src.algorithms.algorithm_utils import fit_univar_distr
 from src.evaluation.evaluation_utils import get_scores_channelwise, threshold_and_predict
-# from datetime import datetime
+from datetime import datetime
 import os
 from sklearn.metrics import recall_score, classification_report
 import logging
@@ -168,8 +168,7 @@ def experiment_on_folder(dataset_name, model_name, folder_idx, feature_type,
     
     return aps, auroc, acc
 
-def experiments_on_dataset(dataset_name, model_name, feature_type, distr_name='normalized_error', algorithm='default', 
-                            edBB_pretrain=False, edBB_finetune=False):
+def experiments_on_dataset(dataset_name, model_name, feature_type, distr_name='normalized_error', algorithm='default', edBB_pretrain=False, edBB_finetune=False):
     pretrained_model = None
     if edBB_pretrain:
         print('training on edBB...')
@@ -198,13 +197,36 @@ def experiments_on_dataset(dataset_name, model_name, feature_type, distr_name='n
     print(f"APS: {aps_avg:0.3f}, AUROC: {auroc_avg:0.3f}, Precision: {acc_avg:0.3f}\n")
     return aps_avg, auroc_avg, acc_avg
 
+
+def run_all_experiments(dataset_name, model_names, distr_name, algorithm, mode):
+    metrics = ['Acc','APS', 'AUROC']
+    results = pd.DataFrame(data=np.zeros((len(model_names),len(feature_types)*len(metrics))), 
+                            columns=pd.MultiIndex.from_product([feature_types, metrics]), index=model_names)
+    edBB_pretrain = False
+    edBB_finetune = False
+    if mode == 'edBB_pretrain':
+        edBB_pretrain = True
+    elif mode == 'edBB_finetune':
+        edBB_pretrain = True
+        edBB_finetune = True
+
+    for  model_name in model_names:
+        for feature_name in feature_types:
+            aps, roc, acc = experiments_on_dataset(dataset_name, model_name, feature_name, distr_name, algorithm, edBB_pretrain, edBB_finetune)
+            results.loc[model_name, feature_name] = [acc, aps, roc]
+    time_now = datetime.utcnow().strftime('%Y_%m_%d_%H_%M_%S')
+    results.to_csv(f'mvts_results_{time_now}.csv')
+    print(f'results are saved to "results_{time_now}.csv"')
+
 if __name__ == '__main__':
     datasets = ['edBB', 'MyDataset']
     feature_types = ['original', 'angle', 'distance', 'angle_distance', 'angle_plus_distance']
     model_names = ['AutoEncoder', 'LSTMED', 'VAE_LSTM','UnivarAutoEncoder',  'OmniAnoAlgo','MSCRED', 'TcnED', 'PcaRecons', 'RawSignalBaseline']
     distr_names = ['normalized_error', 'univar_gaussian']#, 'univar_lognormal', 'univar_lognorm_add1_loc0', 'chi']
     thresh_methods = ['top_k_time']#, 'best_f1_test', 'tail_prob']
+    algorithms = ['default', 'multipass']
     dataset_name, model_name, folder_idx, feature_type = datasets[1], model_names[0], 1, feature_types[2]
-    experiment_on_folder(dataset_name, model_name, folder_idx, feature_type=feature_type, score_distr_name=distr_names[0])
+    # experiment_on_folder(dataset_name, model_name, folder_idx, feature_type=feature_type, score_distr_name=distr_names[0])
     # experiments_on_dataset(dataset_name, model_name, feature_type, distr_names[1], algorithm='default')
-    # experiments_on_dataset(dataset_name, model_name, feature_type, distr_names[1], algorithm='algo_2')
+    # experiments_on_dataset(dataset_name, model_name, feature_type, distr_names[1], algorithm='multipass')
+    run_all_experiments(dataset_name,[model_names[0]], distr_names[0], algorithms[0], 'default')
