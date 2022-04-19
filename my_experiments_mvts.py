@@ -1,6 +1,6 @@
 from sklearn.metrics import classification_report
 from my_data_functions import load_data_partial, get_results, load_edBB_all
-from src.algorithms import AutoEncoder
+from src.algorithms import AutoEncoder, LSTMED, UnivarAutoEncoder,VAE_LSTM, OmniAnoAlgo
 from src.algorithms.algorithm_utils import get_sub_seqs
 # from my_experiments_mvts import get_normalized_scores, get_fitted_scores, collect_results, setup_out_dir 
 import numpy as np
@@ -70,18 +70,18 @@ def get_model(model_name,features_dim, out_dir=None):
 
     if model_name == 'AutoEncoder':
         model = AutoEncoder(sequence_length=sequence_length, num_epochs=num_epochs, hidden_size=hidden_size, lr=learning_rate,batch_size=batch_size, seed=seed, gpu=0, out_dir=out_dir)
-    # elif model_name == 'UnivarAutoEncoder':
-    #     model = UnivarAutoEncoder(sequence_length=sequence_length, num_epochs=num_epochs, hidden_size=hidden_size, lr=learning_rate,batch_size=batch_size, seed=seed, gpu=0, out_dir=out_dir)
-    # # elif model_name == 'LSTMED':
-    #     model = LSTMED(sequence_length=sequence_length,hidden_size=hidden_size,num_epochs=num_epochs,batch_size=batch_size,lr=learning_rate,n_layers=n_layers_ed,seed=seed, gpu=0, out_dir=out_dir)
-    # elif model_name == 'VAE_LSTM':
-    #     model = VAE_LSTM(sequence_length=sequence_length, num_epochs= num_epochs,n_dim=features_dim, intermediate_dim=2*hidden_size, z_dim=hidden_size, lr=learning_rate,batch_size=batch_size, seed=seed, gpu=0, out_dir=out_dir)
+    elif model_name == 'UnivarAutoEncoder':
+        model = UnivarAutoEncoder(sequence_length=sequence_length, num_epochs=num_epochs, hidden_size=hidden_size, lr=learning_rate,batch_size=batch_size, seed=seed, gpu=0, out_dir=out_dir)
+    elif model_name == 'LSTMED':
+        model = LSTMED(sequence_length=sequence_length,hidden_size=hidden_size,num_epochs=num_epochs,batch_size=batch_size,lr=learning_rate,n_layers=n_layers_ed,seed=seed, gpu=0, out_dir=out_dir)
+    elif model_name == 'VAE_LSTM':
+        model = VAE_LSTM(sequence_length=sequence_length, num_epochs= num_epochs,n_dim=features_dim, intermediate_dim=2*hidden_size, z_dim=hidden_size, lr=learning_rate,batch_size=batch_size, seed=seed, gpu=0, out_dir=out_dir)
     # elif model_name == 'TcnED':
     #     model = TcnED(sequence_length=sequence_length,num_epochs= num_epochs, num_channels=[features_dim],kernel_size=hidden_size, lr=learning_rate,batch_size=batch_size, seed=seed, gpu=0, out_dir=out_dir)
     # elif model_name == 'MSCRED':
     #     model = MSCRED(sequence_length=sequence_length, num_epochs=num_epochs, lr=learning_rate, batch_size=batch_size, seed=seed, gpu=0, out_dir=out_dir)
-    # elif model_name == 'OmniAnoAlgo':
-    #     model = OmniAnoAlgo(sequence_length=sequence_length, num_epochs=num_epochs,z_dim=hidden_size, batch_size=batch_size, seed=seed, gpu=0, out_dir=out_dir)
+    elif model_name == 'OmniAnoAlgo':
+        model = OmniAnoAlgo(sequence_length=sequence_length, num_epochs=num_epochs,z_dim=hidden_size, batch_size=batch_size, seed=seed, gpu=0, out_dir=out_dir)
     # elif model_name == 'PcaRecons':
     #     model = PcaRecons(seed=seed, out_dir=out_dir)    
     # elif model_name == 'RawSignalBaseline':
@@ -225,8 +225,8 @@ if __name__ == '__main__':
     distr_names = ['normalized_error', 'univar_gaussian']#, 'univar_lognormal', 'univar_lognorm_add1_loc0', 'chi']
     thresh_methods = ['top_k_time']#, 'best_f1_test', 'tail_prob']
     algorithms = ['default', 'multipass']
-    dataset_name, model_name, folder_idx, feature_type = datasets[1], model_names[0], 1, feature_types[2]
-    # experiment_on_folder(dataset_name, model_name, folder_idx, feature_type=feature_type, score_distr_name=distr_names[0])
+    dataset_name, model_name, folder_idx, feature_type = datasets[1], model_names[2], 1, feature_types[2]
+    experiment_on_folder(dataset_name, model_name, folder_idx, feature_type=feature_type, score_distr_name=distr_names[0])
     # experiments_on_dataset(dataset_name, model_name, feature_type, distr_names[1], algorithm='default')
     # experiments_on_dataset(dataset_name, model_name, feature_type, distr_names[1], algorithm='multipass')
-    run_all_experiments(dataset_name,[model_names[0]], distr_names[0], algorithms[0], 'default')
+    # run_all_experiments(dataset_name,[model_names[0]], distr_names[1], algorithms[0], 'default')

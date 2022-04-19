@@ -122,6 +122,66 @@ class VAE_LSTM(Algorithm, TensorflowUtils):
         recons_error_laststep = np.squeeze(recons_error[:,-1,:])
         self.additional_params['val_reconstr_errors'] = recons_error_laststep
 
+    def fit_sequences(self, sequences):
+        train_sequences, val_sequences = get_train_data_loaders(sequences, batch_size=self.batch_size,
+                                                                splits=[1 - self.train_val_percentage,
+                                                                        self.train_val_percentage], seed=self.seed, usetorch=False)
+        with self.device:
+            model = LSTM_Var_Autoencoder(intermediate_dim=self.intermediate_dim, z_dim=self.z_dim, n_dim=self.n_dim,
+                                         stateful=self.stateful, model_id=self.model_id)
+            train_loss, val_loss, best_val_loss = model.fit(train_sequences, val_sequences, learning_rate=self.lr,
+                batch_size=self.batch_size, num_epochs=self.num_epochs, REG_LAMBDA=self.REG_LAMBDA,
+                grad_clip_norm=self.grad_clip_norm, optimizer_params=self.optimizer_params, verbose=self.verbose,
+                                                            patience=self.patience)
+        self.model = model
+        self.additional_params["train_loss_per_epoch"] = train_loss
+        self.additional_params["val_loss_per_epoch"] = val_loss
+        self.additional_params["best_val_loss"] = best_val_loss
+        # validation reconstruction error
+        recons_error = []
+        with self.device:
+            num_batch = int(np.ceil(len(val_sequences)/self.batch_size))
+            for i in range(num_batch):
+                s = val_sequences[i*self.batch_size:(i+1)*self.batch_size]
+                _, recons_error_s = self.model.reconstruct(s, get_error = True) # returns squared error
+                recons_error.append(recons_error_s)
+        recons_error = np.vstack(recons_error)
+        # follows reconstrunction error computation in predict_test_scores in src.algorithms.algorithm_utils
+        # convert to L1 loss
+        # also only use recontruction and error for last point at each sequence
+        recons_error = np.sqrt(recons_error) # n_samp x timesteps x n_dim
+        recons_error_laststep = np.squeeze(recons_error[:,-1,:])
+        self.additional_params['val_reconstr_errors'] = recons_error_laststep
+
+    def predict_sequences(self, sequences):
+        padding = np.zeros((self.sequence_length-1, sequences.shape[-1]))
+        reconstructed = []
+        recons_error = []
+        with self.device:
+            num_batch = int(np.ceil(len(sequences)/self.batch_size))
+            for i in range(num_batch):
+                s = sequences[i*self.batch_size:(i+1)*self.batch_size]
+                reconstructed_s, recons_error_s = self.model.reconstruct(s, get_error = True) # returns squared error
+                reconstructed.append(reconstructed_s)
+        reconstructed = np.vstack(reconstructed)
+        # only use recontruction and error for last point at each sequence
+        reconstructed_laststep = np.squeeze(reconstructed[:,-1,:])
+        # fill NaN with previous value for reconstruction
+        reconstructed_laststep_df = pd.DataFrame(reconstructed_laststep)
+        reconstructed_laststep_df.fillna(method='ffill', inplace=True)
+        reconstructed_laststep = np.asarray(reconstructed_laststep_df)
+        # recons_error_laststep = np.abs(data[-reconstructed_laststep.shape[0]:] - reconstructed_laststep)
+        seqs = sequences[:,-1,:]
+        recons_error_laststep = np.abs(seqs[-reconstructed_laststep.shape[0]:] - reconstructed_laststep)
+
+        predictions_dic = {'score_t': None,
+                           'score_tc': None,
+                           'error_t': None,
+                           'error_tc': np.vstack((padding, recons_error_laststep)),
+                           'recons_tc': np.vstack((padding, reconstructed_laststep))
+                           }
+        return predictions_dic
+    
     def get_val_loss(self):
         try:
             val_loss = self.additional_params["best_val_loss"]
