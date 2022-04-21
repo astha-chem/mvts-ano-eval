@@ -1,4 +1,6 @@
+from site import addsitedir
 from sklearn.metrics import classification_report
+from torch import add
 from my_data_functions import load_data_partial, get_results, load_edBB_all
 from src.algorithms import AutoEncoder, LSTMED, UnivarAutoEncoder,VAE_LSTM, OmniAnoAlgo
 from src.algorithms.algorithm_utils import get_sub_seqs
@@ -120,28 +122,38 @@ def experiment_on_folder(dataset_name, model_name, folder_idx, feature_type,
 
     x_seqs = get_sub_seqs(x_data.values, seq_len=sequence_length)
     y_seqs = np.array([1 if sum(y_data.iloc[i:i + sequence_length])>0 else 0 for i in range(len(x_seqs))])
-    n_eter = 4
     train_ratio = 0.3
-    n_train = int(len(x_seqs) * train_ratio)
-    x_train_all = x_seqs[:n_train]
-    y_train_all = y_seqs[:n_train]
-    x_test_all = x_seqs[n_train:]
-    y_test_all = y_seqs[n_train:]
-
+    top_ratio = 0.2
+    top_k = int(len(x_seqs) * top_ratio)
     top_k = np.sum(y_seqs)
+    val_ratio = 0.25
     i=0
+    x_train = None
+    use_only_new_data = True
     while  True:
         n_train = int(len(x_seqs) * train_ratio)
-        x_train = x_seqs[:n_train]
-        y_train = y_seqs[:n_train]
+        if x_train is None or use_only_new_data:
+            x_train = x_seqs[:n_train]
+            y_train = y_seqs[:n_train]
+            if i == 0:
+                n_train = int(len(x_train) * (1-val_ratio))
+                x_train = x_train[:n_train]
+                y_train = y_train[:n_train]
+                x_val = x_train[n_train:]
+                y_val = y_train[n_train:]
+        else:
+            x_train = np.concatenate((x_train, x_seqs[:n_train]), axis=0)
+            y_train = np.concatenate((y_train, y_seqs[:n_train]), axis=0)
+
         x_test = x_seqs[n_train:]
         y_test = y_seqs[n_train:]
+    
 
         if len(x_test) < top_k:
             break
             
 
-        model.fit_sequences(x_train)
+        model.fit_sequences(x_train, x_val)
         test_preds = model.predict_sequences(x_test)
         train_preds = model.predict_sequences(x_train)
         if score_distr_name == 'normalized_error':
@@ -163,6 +175,9 @@ def experiment_on_folder(dataset_name, model_name, folder_idx, feature_type,
         test_idx = np.argsort(test_scores)
         x_seqs = x_test[test_idx]
         y_seqs = y_test[test_idx]
+
+       
+
         i += 1
     
     
@@ -225,8 +240,8 @@ if __name__ == '__main__':
     distr_names = ['normalized_error', 'univar_gaussian']#, 'univar_lognormal', 'univar_lognorm_add1_loc0', 'chi']
     thresh_methods = ['top_k_time']#, 'best_f1_test', 'tail_prob']
     algorithms = ['default', 'multipass']
-    dataset_name, model_name, folder_idx, feature_type = datasets[1], model_names[2], 1, feature_types[2]
-    experiment_on_folder(dataset_name, model_name, folder_idx, feature_type=feature_type, score_distr_name=distr_names[0])
+    dataset_name, model_name, folder_idx, feature_type = datasets[1], model_names[0], 1, feature_types[2]
+    experiment_on_folder(dataset_name, model_name, folder_idx, feature_type=feature_type, score_distr_name=distr_names[0],algorithm=algorithms[1])
     # experiments_on_dataset(dataset_name, model_name, feature_type, distr_names[1], algorithm='default')
     # experiments_on_dataset(dataset_name, model_name, feature_type, distr_names[1], algorithm='multipass')
-    # run_all_experiments(dataset_name,[model_names[0]], distr_names[1], algorithms[0], 'default')
+    # run_all_experiments(dataset_name,[model_names[0]], distr_names[1], algorithms[1], 'default')

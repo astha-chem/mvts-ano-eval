@@ -78,16 +78,24 @@ class AutoEncoder(Algorithm, PyTorchUtils):
         self.additional_params["val_loss_per_epoch"] = val_loss
         self.additional_params["best_val_loss"] = best_val_loss
 
-    def fit_sequences(self, sequences):
-        train_loader, train_val_loader = get_train_data_loaders(sequences, batch_size=self.batch_size,
-                                                                splits=[1 - self.train_val_percentage,
-                                                                        self.train_val_percentage], seed=self.seed)
+    def fit_sequences(self, train_seqs, val_seqs):
+        train_loader = DataLoader(dataset=train_seqs, batch_size=self.batch_size, drop_last=False, pin_memory=True, shuffle=False)
+        train_val_loader = DataLoader(dataset=val_seqs, batch_size=self.batch_size, drop_last=False, pin_memory=True, shuffle=False)
+        
+            
         if self.model is None:                                                                        
-            self.model = AutoEncoderModule(sequences.shape[-1], self.sequence_length, self.hidden_size, seed=self.seed, gpu=self.gpu)
-        self.model, train_loss, val_loss, val_reconstr_errors, best_val_loss = \
+            self.model = AutoEncoderModule(train_seqs.shape[-1], self.sequence_length, self.hidden_size, seed=self.seed, gpu=self.gpu)
+            self.last_best_val_loss = None
+
+        trained_model, train_loss, val_loss, val_reconstr_errors, best_val_loss = \
             fit_with_early_stopping(train_loader, train_val_loader, self.model, patience=self.patience,
                                     num_epochs=self.num_epochs, lr=self.lr, verbose=True, last_t_only=self.last_t_only,
                                     ret_best_val_loss=True)
+        
+        if self.last_best_val_loss is None or self.last_best_val_loss > best_val_loss:                                                                        
+            self.last_best_val_loss = best_val_loss
+            self.model = trained_model
+        
     def get_val_loss(self):
         try:
             val_loss = self.additional_params["best_val_loss"]
