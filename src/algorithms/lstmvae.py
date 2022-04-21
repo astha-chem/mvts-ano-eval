@@ -122,14 +122,12 @@ class VAE_LSTM(Algorithm, TensorflowUtils):
         recons_error_laststep = np.squeeze(recons_error[:,-1,:])
         self.additional_params['val_reconstr_errors'] = recons_error_laststep
 
-    def fit_sequences(self, sequences):
-        train_sequences, val_sequences = get_train_data_loaders(sequences, batch_size=self.batch_size,
-                                                                splits=[1 - self.train_val_percentage,
-                                                                        self.train_val_percentage], seed=self.seed, usetorch=False)
+    def fit_sequences(self, train_seqs, val_seqs):
+
         with self.device:
             model = LSTM_Var_Autoencoder(intermediate_dim=self.intermediate_dim, z_dim=self.z_dim, n_dim=self.n_dim,
                                          stateful=self.stateful, model_id=self.model_id)
-            train_loss, val_loss, best_val_loss = model.fit(train_sequences, val_sequences, learning_rate=self.lr,
+            train_loss, val_loss, best_val_loss = model.fit(train_seqs, val_seqs, learning_rate=self.lr,
                 batch_size=self.batch_size, num_epochs=self.num_epochs, REG_LAMBDA=self.REG_LAMBDA,
                 grad_clip_norm=self.grad_clip_norm, optimizer_params=self.optimizer_params, verbose=self.verbose,
                                                             patience=self.patience)
@@ -140,9 +138,9 @@ class VAE_LSTM(Algorithm, TensorflowUtils):
         # validation reconstruction error
         recons_error = []
         with self.device:
-            num_batch = int(np.ceil(len(val_sequences)/self.batch_size))
+            num_batch = int(np.ceil(len(val_seqs)/self.batch_size))
             for i in range(num_batch):
-                s = val_sequences[i*self.batch_size:(i+1)*self.batch_size]
+                s = val_seqs[i*self.batch_size:(i+1)*self.batch_size]
                 _, recons_error_s = self.model.reconstruct(s, get_error = True) # returns squared error
                 recons_error.append(recons_error_s)
         recons_error = np.vstack(recons_error)

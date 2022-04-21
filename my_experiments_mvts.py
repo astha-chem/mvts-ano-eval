@@ -1,10 +1,7 @@
-from site import addsitedir
-from sklearn.metrics import classification_report
-from torch import add
+from unittest import result
 from my_data_functions import load_data_partial, get_results, load_edBB_all
 from src.algorithms import AutoEncoder, LSTMED, UnivarAutoEncoder,VAE_LSTM, OmniAnoAlgo
 from src.algorithms.algorithm_utils import get_sub_seqs
-# from my_experiments_mvts import get_normalized_scores, get_fitted_scores, collect_results, setup_out_dir 
 import numpy as np
 import pandas as pd
 
@@ -12,7 +9,7 @@ from src.algorithms.algorithm_utils import fit_univar_distr
 from src.evaluation.evaluation_utils import get_scores_channelwise, threshold_and_predict
 from datetime import datetime
 import os
-from sklearn.metrics import recall_score, classification_report
+from sklearn.metrics import recall_score
 import logging
 from src.datasets.dataset import get_events
 
@@ -20,7 +17,8 @@ from src.datasets.dataset import get_events
 body_parts = ['full', 'upper']
 body_part = body_parts[1]
 sequence_length = 15
-num_epochs = 50
+# num_epochs = 50
+num_epochs = 5
 hidden_size = 10
 n_layers_ed = (10,10)
 batch_size = 16
@@ -130,6 +128,7 @@ def experiment_on_folder(dataset_name, model_name, folder_idx, feature_type,
     i=0
     x_train = None
     use_only_new_data = True
+    results = []
     while  True:
         n_train = int(len(x_seqs) * train_ratio)
         if x_train is None or use_only_new_data:
@@ -137,10 +136,11 @@ def experiment_on_folder(dataset_name, model_name, folder_idx, feature_type,
             y_train = y_seqs[:n_train]
             if i == 0:
                 n_train = int(len(x_train) * (1-val_ratio))
-                x_train = x_train[:n_train]
-                y_train = y_train[:n_train]
                 x_val = x_train[n_train:]
                 y_val = y_train[n_train:]
+                x_train = x_train[:n_train]
+                y_train = y_train[:n_train]
+
         else:
             x_train = np.concatenate((x_train, x_seqs[:n_train]), axis=0)
             y_train = np.concatenate((y_train, y_seqs[:n_train]), axis=0)
@@ -167,8 +167,8 @@ def experiment_on_folder(dataset_name, model_name, folder_idx, feature_type,
         print(f'results of {i+1}st iteration:')
         print('number of test sequences: ', len(x_test))
         # if i==0:
-        aps, auroc, acc = get_results(y_test, test_scores, top_k= top_k)
-        
+        aps, auroc, acc = get_results(y_test, test_scores, top_k= top_k, print_results=False)
+        results.append(f'\niteration {i+1}: APS={aps:0.3f}, AUROC={auroc:0.3f}, ACC={acc:0.3f}')
         if algorithm == 'default':
             break
 
@@ -180,7 +180,7 @@ def experiment_on_folder(dataset_name, model_name, folder_idx, feature_type,
 
         i += 1
     
-    
+    print(*results)
     return aps, auroc, acc
 
 def experiments_on_dataset(dataset_name, model_name, feature_type, distr_name='normalized_error', algorithm='default', edBB_pretrain=False, edBB_finetune=False):
@@ -240,8 +240,8 @@ if __name__ == '__main__':
     distr_names = ['normalized_error', 'univar_gaussian']#, 'univar_lognormal', 'univar_lognorm_add1_loc0', 'chi']
     thresh_methods = ['top_k_time']#, 'best_f1_test', 'tail_prob']
     algorithms = ['default', 'multipass']
-    dataset_name, model_name, folder_idx, feature_type = datasets[1], model_names[0], 1, feature_types[2]
+    dataset_name, model_name, folder_idx, feature_type = datasets[1], model_names[2], 1, feature_types[0]
     experiment_on_folder(dataset_name, model_name, folder_idx, feature_type=feature_type, score_distr_name=distr_names[0],algorithm=algorithms[1])
     # experiments_on_dataset(dataset_name, model_name, feature_type, distr_names[1], algorithm='default')
     # experiments_on_dataset(dataset_name, model_name, feature_type, distr_names[1], algorithm='multipass')
-    # run_all_experiments(dataset_name,[model_names[0]], distr_names[1], algorithms[1], 'default')
+    # run_all_experiments(dataset_name,[model_names[0]], distr_names[1], algorithms[0], mode='default')
