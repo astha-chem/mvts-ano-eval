@@ -240,8 +240,8 @@ if __name__ == '__main__':
     distr_names = ['normalized_error', 'univar_gaussian']#, 'univar_lognormal', 'univar_lognorm_add1_loc0', 'chi']
     thresh_methods = ['top_k_time']#, 'best_f1_test', 'tail_prob']
     algorithms = ['default', 'multipass']
-    dataset_name, model_name, folder_idx, feature_type = datasets[1], model_names[2], 1, feature_types[0]
-    experiment_on_folder(dataset_name, model_name, folder_idx, feature_type=feature_type, score_distr_name=distr_names[0],algorithm=algorithms[1])
+    dataset_name, model_name, folder_idx, feature_type = datasets[1], model_names[3], 1, feature_types[0]
+    experiment_on_folder(dataset_name, model_name, folder_idx, feature_type=feature_type, score_distr_name=distr_names[0],algorithm=algorithms[0])
     # experiments_on_dataset(dataset_name, model_name, feature_type, distr_names[1], algorithm='default')
     # experiments_on_dataset(dataset_name, model_name, feature_type, distr_names[1], algorithm='multipass')
     # run_all_experiments(dataset_name,[model_names[0]], distr_names[1], algorithms[0], mode='default')

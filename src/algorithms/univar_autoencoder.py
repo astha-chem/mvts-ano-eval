@@ -71,6 +71,22 @@ class UnivarAutoEncoder(Algorithm, PyTorchUtils):
         torch.save(model, model_filename)
         return model_filename, channel_num, train_loss, val_loss, val_reconstr_errors, best_val_loss
 
+    @staticmethod
+    def fit_one_channel_sequences(train_seqs, val_seqs, channel_num, out_dir, params):
+        train_loader = DataLoader(dataset=train_seqs, batch_size=params['batch_size'], drop_last=False, pin_memory=True, shuffle=False)
+        train_val_loader = DataLoader(dataset=val_seqs, batch_size=params['batch_size'], drop_last=False, pin_memory=True, shuffle=False)
+
+        model = AutoEncoderModule(1, params['sequence_length'], params['hidden_size'], seed=params['seed'],
+                                                    gpu=params['gpu'])
+
+        model, train_loss, val_loss, val_reconstr_errors, best_val_loss = \
+            fit_with_early_stopping(train_loader, train_val_loader, model, patience=params['patience'],
+                                    num_epochs=params['num_epochs'], lr=params['lr'], last_t_only=params["last_t_only"],
+                                    ret_best_val_loss=True)
+        model_filename = os.path.join(out_dir, "trained_model_channel_%i" % channel_num)
+        torch.save(model, model_filename)
+        return model_filename, channel_num, train_loss, val_loss, val_reconstr_errors, best_val_loss
+
     def predict_one_channel(self, channel_data, channel_num, starts_discont=np.array([])):
         sequences = get_sub_seqs(channel_data, seq_len=self.sequence_length, stride=1, start_discont=starts_discont)
         test_loader = DataLoader(dataset=sequences, batch_size=self.batch_size, drop_last=False, pin_memory=True,
@@ -79,6 +95,12 @@ class UnivarAutoEncoder(Algorithm, PyTorchUtils):
                                                              return_output=True)
         return (reconstr_errors, outputs_array)
 
+    def predict_one_channel_sequences(self, sequences, channel_num, starts_discont=np.array([])):
+        test_loader = DataLoader(dataset=sequences, batch_size=self.batch_size, drop_last=False, pin_memory=True,
+                                 shuffle=False)
+        reconstr_errors, outputs_array = predict_test_scores(self.model[channel_num], test_loader,
+                                                             return_output=True)
+        return (reconstr_errors, outputs_array)
 
     def fit(self, X: pd.DataFrame):
         X.interpolate(inplace=True)
@@ -97,6 +119,36 @@ class UnivarAutoEncoder(Algorithm, PyTorchUtils):
             print("Training univariate model on channel number %i" % channel_num)
             args = (data[:, channel_num].reshape(-1, 1), channel_num, self.out_dir, self.init_params)
             results.append(pool.apply_async(self.fit_one_channel, args=args))
+        return_values = [result.get() for result in results]
+        pool.close()
+        pool.terminate()
+        pool.join()
+        # print("results: {}".format(roots[:-1]))
+        for return_value in return_values:
+            model_filename, channel_num, train_loss, val_loss, val_reconstr_scores, best_val_loss = return_value
+            self.model[channel_num] = torch.load(model_filename)
+            self.additional_params["train_loss_per_epoch"].append(train_loss)
+            self.additional_params["val_loss_per_epoch"].append(val_loss)
+            self.additional_params["val_reconstr_errors"].append(val_reconstr_scores)
+            self.additional_params["best_val_loss"].append(best_val_loss)
+
+    def fit_sequences(self, train_seqs, val_seqs):
+        # X.interpolate(inplace=True)
+        # X.bfill(inplace=True)
+        # data = X.values
+        self.additional_params["train_channels"] = train_seqs.shape[-1]
+        self.model = [0] * self.additional_params["train_channels"]
+        self.additional_params["train_loss_per_epoch"] = []
+        self.additional_params["val_loss_per_epoch"] = []
+        self.additional_params["val_reconstr_errors"] = []
+        self.additional_params["best_val_loss"] = []
+        ctx = mp.get_context('spawn')
+        pool = ctx.Pool(processes=self.n_processes)
+        results = []
+        for channel_num in range(self.additional_params["train_channels"]):
+            print("Training univariate model on channel number %i" % channel_num)
+            args = (train_seqs[:,:,channel_num], val_seqs[:,:,channel_num], channel_num, self.out_dir, self.init_params)
+            results.append(pool.apply_async(self.fit_one_channel_sequences, args=args))
         return_values = [result.get() for result in results]
         pool.close()
         pool.terminate()
@@ -154,6 +206,31 @@ class UnivarAutoEncoder(Algorithm, PyTorchUtils):
                            'recons_tc': outputs_array,
                            }
         return predictions_dic
+    
+    @torch.no_grad()
+    def predict_sequences(self, sequences):
+        # X.interpolate(inplace=True)
+        # X.bfill(inplace=True)
+        # data = X.values
+        intermediate_scores = []
+        outputs_array = []
+        for channel_num in range(self.additional_params["train_channels"]):
+            chan_scores, chan_outputs = self.predict_one_channel_sequences(sequences[:,:, channel_num], channel_num,
+                                                                 starts_discont=np.array([]))
+            chan_scores = chan_scores.reshape((-1))
+            chan_outputs = chan_outputs.reshape((-1))
+            intermediate_scores.append(chan_scores)
+            outputs_array.append(chan_outputs)
+        intermediate_scores = np.array(intermediate_scores).T
+        outputs_array = np.array(outputs_array).T
+        predictions_dic = {'score_t': None,
+                           'score_tc': None,
+                           'error_t': None,
+                           'error_tc': intermediate_scores,
+                           'recons_tc': outputs_array,
+                           }
+        return predictions_dic
+
 
 def main():
     from src.datasets.skab import Skab
