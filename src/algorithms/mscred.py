@@ -1,3 +1,4 @@
+from msilib import sequence
 import sys, os
 import numpy as np
 import pandas as pd
@@ -112,6 +113,51 @@ class MSCRED(Algorithm, PyTorchUtils):
         self.additional_params['val_reconstr_errors'] = val_reconstr_errors        
         self.additional_params["best_val_loss"] = best_val_loss
 
+    
+    def fit_sequences(self, train_seqs, val_seqs):
+
+        # X.interpolate(inplace=True)
+        # X.bfill(inplace=True)
+        # data = X.values
+        # pca = None
+        # if self.pca_comp is not None:
+        #     pca = PCA(n_components=self.pca_comp, svd_solver='full')
+        # elif self.explained_var is not None:
+        #     pca = PCA(n_components=self.explained_var, svd_solver='full')        
+        # self.additional_params["pca"] = pca
+        # if pca is not None:
+        #     # Project input data on a limited number of principal components
+        #     pca.fit(data)
+        #     self.additional_params["pca_expl_var"] = pca.explained_variance_
+        #     self.additional_params["pca_n_comp"] = pca.n_components_
+        #     data = pca.transform(data)
+        # sequences = get_sub_seqs(data, seq_len=self.sequence_length, stride=self.stride,
+        #                          start_discont=self.train_starts) # n_samp x timesteps x n_dim
+        sequences  = np.concatenate((train_seqs, val_seqs), axis=0)
+        # create signature matrices
+        n_dim = sequences.shape[2]
+        matrices = np.zeros((sequences.shape[0], 3, self.step_max,
+            n_dim, n_dim))
+        for i in range(sequences.shape[0]):
+            raw_data_i = sequences[i]
+            for k,w in enumerate(self.win_size):
+                pad = self.sequence_length - self.step_max*w
+                for j in range(self.step_max):
+                    raw_data_ij = raw_data_i[(pad+j*w):(pad+(j+1)*w)]
+                    matrices[i,k,j] = np.dot(raw_data_ij.T, raw_data_ij) / w
+        self.train_val_percentage = len(val_seqs)/len(sequences)
+        train_loader, train_val_loader = get_train_data_loaders(matrices, batch_size=self.batch_size,
+            splits=[1 - self.train_val_percentage, self.train_val_percentage], seed=self.seed)
+        
+        self.model = MSCREDModule(num_timesteps=self.step_max, attention=True, seed=self.seed, gpu=self.gpu)
+        self.model, train_loss, val_loss, val_reconstr_errors, best_val_loss = \
+            fit_with_early_stopping(train_loader, train_val_loader, self.model, patience=self.patience,
+                                    num_epochs=self.num_epochs, lr=self.lr, ret_best_val_loss=True)
+        self.additional_params["train_loss_per_epoch"] = train_loss
+        self.additional_params["val_loss_per_epoch"] = val_loss
+        self.additional_params['val_reconstr_errors'] = val_reconstr_errors        
+        self.additional_params["best_val_loss"] = best_val_loss
+
     def get_val_loss(self):
         try:
             val_loss = self.additional_params["best_val_loss"]
@@ -160,6 +206,36 @@ class MSCRED(Algorithm, PyTorchUtils):
                            }
         return predictions_dic
 
+    @torch.no_grad()
+    def predict_sequences(self, sequences) -> np.array:
+        # X.interpolate(inplace=True)
+        # X.bfill(inplace=True)
+        # data = X.values
+        # pca = self.additional_params["pca"]        
+        # if pca is not None:
+        #     data = pca.transform(data)
+        # sequences = get_sub_seqs(data, seq_len=self.sequence_length, stride=1)
+        n_dim = sequences.shape[2]
+        matrices = np.zeros((sequences.shape[0], 3, self.step_max,
+            n_dim, n_dim))
+        for i in range(sequences.shape[0]):
+            raw_data_i = sequences[i]
+            for k,w in enumerate(self.win_size):
+                pad = self.sequence_length - self.step_max*w
+                for j in range(self.step_max):
+                    raw_data_ij = raw_data_i[(pad+j*w):(pad+(j+1)*w)]
+                    matrices[i,k,j] = np.dot(raw_data_ij.T, raw_data_ij) / w
+        test_loader = DataLoader(dataset=matrices, batch_size=self.batch_size, drop_last=False, pin_memory=True,
+                                 shuffle=False)
+        reconstr_errors  = predict_test_scores(self.model, test_loader)
+        padding = np.zeros((self.sequence_length-1, sequences.shape[-1]))
+        predictions_dic = {'score_t': None,
+                           'score_tc': None,
+                           'error_t': None,
+                           'error_tc': np.vstack((padding, reconstr_errors)),
+                           'recons_tc': None
+                           }
+        return predictions_dic
 
 def main():
     from src.datasets.skab import Skab    

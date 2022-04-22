@@ -2,7 +2,7 @@ from tfsnippet.scaffold import CheckpointSaver
 from tfsnippet.utils import get_variables_as_dict, Config
 from src.algorithms.omni_anomaly.model import OmniAnomaly
 from src.algorithms.omni_anomaly.prediction import Predictor
-from src.algorithms.omni_anomaly.training import Trainer
+from src.algorithms.omni_anomaly.training import Trainer, sequence_to_data
 import pandas as pd
 from src.algorithms.algorithm_utils import *
 """OmniAnomaly adapted from https://github.com/NetManAIOps/OmniAnomaly (MIT License)"""
@@ -84,6 +84,42 @@ class OmniAnoAlgo(Algorithm, TensorflowUtils):
                 train_score, train_z, train_pred_speed = self.predictor.get_score(data)
                 self.normal_scores = -np.sum(train_score, axis=1)
 
+    def fit_sequences(self, train_seqs, val_seqs):
+        # X.interpolate(inplace=True)
+        # X.bfill(inplace=True)
+        # data = X.values
+        self.config.x_dim = train_seqs.shape[-1]
+        tf.reset_default_graph()
+        with tf.variable_scope('model') as model_vs:
+            self.model = OmniAnomaly(config=self.config, name="model")
+            # construct the trainer
+            self.trainer = Trainer(model=self.model,
+                                   model_vs=model_vs,
+                                   max_epoch=self.config.max_epoch,
+                                   batch_size=self.config.batch_size,
+                                   valid_batch_size=self.config.test_batch_size,
+                                   initial_lr=self.config.initial_lr,
+                                   lr_anneal_epochs=self.config.lr_anneal_epoch_freq,
+                                   lr_anneal_factor=self.config.lr_anneal_factor,
+                                   grad_clip_norm=self.config.gradient_clip_norm,
+                                   valid_step_freq=self.config.valid_step_freq,
+                                   stride=self.config.stride)
+
+            # construct the predictor
+            self.predictor = Predictor(self.model, batch_size=self.config.batch_size, n_z=self.config.test_n_z,
+                                  last_point_only=True)
+            self.tf_session = tf.Session(config=tf.ConfigProto(allow_soft_placement=True))
+            with self.tf_session.as_default():
+                if self.config.restore_dir is not None:
+                    # Restore variables from `save_dir`.
+                    saver = CheckpointSaver(get_variables_as_dict(model_vs), self.config.restore_dir)
+                    saver.restore()
+
+                metrics_dict = self.trainer.fit_sequences(train_seqs, val_seqs)
+                self.best_val_loss = metrics_dict['best_valid_loss']
+                train_score, train_z, train_pred_speed = self.predictor.get_score(sequence_to_data(train_seqs, self.config.window_length))
+                self.normal_scores = -np.sum(train_score, axis=1)
+
     def get_val_loss(self):
         return self.best_val_loss
 
@@ -93,6 +129,25 @@ class OmniAnoAlgo(Algorithm, TensorflowUtils):
         data = X.values
         with self.tf_session.as_default():
             score_tc, test_z, pred_speed = self.predictor.get_score(data)
+            # Add padding for first window_length time points
+            padding = np.max(score_tc) * np.ones((self.config.window_length - 1, score_tc.shape[1]))
+            score_tc = -np.concatenate((padding, score_tc), axis=0)
+            score_t = np.sum(score_tc, axis=1)
+        predictions_dic = {'score_t': score_t,
+                           'score_tc': score_tc,
+                           'error_t': None,
+                           'error_tc': None,
+                           'recons_tc': None,
+                           }
+        return predictions_dic
+
+    def predict_sequences(self, sequences, starts=np.array([])):
+        # X.interpolate(inplace=True)
+        # X.bfill(inplace=True)
+        # data = X.values
+
+        with self.tf_session.as_default():
+            score_tc, test_z, pred_speed = self.predictor.get_score(sequence_to_data(sequences, self.config.window_length))
             # Add padding for first window_length time points
             padding = np.max(score_tc) * np.ones((self.config.window_length - 1, score_tc.shape[1]))
             score_tc = -np.concatenate((padding, score_tc), axis=0)

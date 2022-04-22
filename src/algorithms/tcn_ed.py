@@ -83,6 +83,33 @@ class TcnED(Algorithm, PyTorchUtils):
         self.additional_params['val_reconstr_errors'] = val_reconstr_errors
         self.additional_params["best_val_loss"] = best_val_loss
 
+    def fit_sequences(self, train_seqs, val_seqs):
+        # X.interpolate(inplace=True)
+        # X.bfill(inplace=True)
+        # data = X.values
+        # if self.pca_comp is not None:
+        #     # Project input data on a limited number of principal components
+        #     pca = PCA(n_components=self.pca_comp, svd_solver='full')
+        #     pca.fit(data)
+        #     self.additional_params["pca"] = pca
+        #     data = pca.transform(data)
+        # sequences = get_sub_seqs(data, seq_len=self.sequence_length, stride=self.stride)
+        # train_loader, train_val_loader = get_train_data_loaders(sequences, batch_size=self.batch_size,
+        #                                                         splits=[1 - self.train_val_percentage,
+        #                                                                 self.train_val_percentage], seed=self.seed)
+        train_loader = DataLoader(dataset=train_seqs, batch_size=self.batch_size, drop_last=False, pin_memory=True, shuffle=False)
+        train_val_loader = DataLoader(dataset=val_seqs, batch_size=self.batch_size, drop_last=False, pin_memory=True, shuffle=False)
+
+        self.model = TcnEDModule(seq_len=self.sequence_length, num_inputs=train_seqs.shape[-1], num_channels=self.num_channels,
+                                 kernel_size=self.kernel_size, dropout=self.dropout, seed=self.seed, gpu=self.gpu)
+        self.model, train_loss, val_loss, val_reconstr_errors, best_val_loss = \
+            fit_with_early_stopping(train_loader, train_val_loader, self.model, patience=self.patience,
+                                    num_epochs=self.num_epochs, lr=self.lr, ret_best_val_loss=True)
+        self.additional_params["train_loss_per_epoch"] = train_loss
+        self.additional_params["val_loss_per_epoch"] = val_loss
+        self.additional_params['val_reconstr_errors'] = val_reconstr_errors
+        self.additional_params["best_val_loss"] = best_val_loss
+
     def get_val_loss(self):
         try:
             val_loss = self.additional_params["best_val_loss"]
@@ -117,6 +144,26 @@ class TcnED(Algorithm, PyTorchUtils):
                            'recons_tc': outputs_array,
                            }
         return predictions_dic
+
+    @torch.no_grad()
+    def predict_sequences(self, sequences) -> np.array:
+        # X.interpolate(inplace=True)
+        # X.bfill(inplace=True)
+        # data = X.values
+        # if self.pca_comp is not None:
+        #     data = self.additional_params["pca"].transform(data)
+        # sequences = get_sub_seqs(data, seq_len=self.sequence_length, stride=1)
+        test_loader = DataLoader(dataset=sequences, batch_size=self.batch_size, drop_last=False, pin_memory=True,
+                                 shuffle=False)
+        reconstr_errors, outputs_array  = predict_test_scores(self.model, test_loader, latent=False, return_output=True)
+        predictions_dic = {'score_t': None,
+                           'score_tc': None,
+                           'error_t': None,
+                           'error_tc': reconstr_errors,
+                           'recons_tc': outputs_array,
+                           }
+        return predictions_dic
+
 
 class TcnEDModule(nn.Module, PyTorchUtils):
     def __init__(self, seq_len:int, num_inputs:int, num_channels:List, seed:int, gpu:int, kernel_size=2, dropout=0.2):

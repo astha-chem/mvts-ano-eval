@@ -95,7 +95,8 @@ class AutoEncoder(Algorithm, PyTorchUtils):
         if self.last_best_val_loss is None or self.last_best_val_loss > best_val_loss:                                                                        
             self.last_best_val_loss = best_val_loss
             self.model = trained_model
-        
+        return self.last_best_val_loss
+
     def get_val_loss(self):
         try:
             val_loss = self.additional_params["best_val_loss"]

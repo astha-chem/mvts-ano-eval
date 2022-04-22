@@ -1,6 +1,5 @@
-from unittest import result
 from my_data_functions import load_data_partial, get_results, load_edBB_all
-from src.algorithms import AutoEncoder, LSTMED, UnivarAutoEncoder,VAE_LSTM, OmniAnoAlgo
+from src.algorithms import AutoEncoder, LSTMED, UnivarAutoEncoder,VAE_LSTM, OmniAnoAlgo, MSCRED, TcnED
 from src.algorithms.algorithm_utils import get_sub_seqs
 import numpy as np
 import pandas as pd
@@ -76,10 +75,10 @@ def get_model(model_name,features_dim, out_dir=None):
         model = LSTMED(sequence_length=sequence_length,hidden_size=hidden_size,num_epochs=num_epochs,batch_size=batch_size,lr=learning_rate,n_layers=n_layers_ed,seed=seed, gpu=0, out_dir=out_dir)
     elif model_name == 'VAE_LSTM':
         model = VAE_LSTM(sequence_length=sequence_length, num_epochs= num_epochs,n_dim=features_dim, intermediate_dim=2*hidden_size, z_dim=hidden_size, lr=learning_rate,batch_size=batch_size, seed=seed, gpu=0, out_dir=out_dir)
-    # elif model_name == 'TcnED':
-    #     model = TcnED(sequence_length=sequence_length,num_epochs= num_epochs, num_channels=[features_dim],kernel_size=hidden_size, lr=learning_rate,batch_size=batch_size, seed=seed, gpu=0, out_dir=out_dir)
-    # elif model_name == 'MSCRED':
-    #     model = MSCRED(sequence_length=sequence_length, num_epochs=num_epochs, lr=learning_rate, batch_size=batch_size, seed=seed, gpu=0, out_dir=out_dir)
+    elif model_name == 'TcnED':
+        model = TcnED(sequence_length=sequence_length,num_epochs= num_epochs, num_channels=[features_dim],kernel_size=hidden_size, lr=learning_rate,batch_size=batch_size, seed=seed, gpu=0, out_dir=out_dir)
+    elif model_name == 'MSCRED':
+        model = MSCRED(sequence_length=sequence_length, num_epochs=num_epochs, lr=learning_rate, batch_size=batch_size, seed=seed, gpu=0, out_dir=out_dir)
     elif model_name == 'OmniAnoAlgo':
         model = OmniAnoAlgo(sequence_length=sequence_length, num_epochs=num_epochs,z_dim=hidden_size, batch_size=batch_size, seed=seed, gpu=0, out_dir=out_dir)
     # elif model_name == 'PcaRecons':
@@ -153,7 +152,7 @@ def experiment_on_folder(dataset_name, model_name, folder_idx, feature_type,
             break
             
 
-        model.fit_sequences(x_train, x_val)
+        best_val_loss = model.fit_sequences(x_train, x_val)
         test_preds = model.predict_sequences(x_test)
         train_preds = model.predict_sequences(x_train)
         if score_distr_name == 'normalized_error':
@@ -162,13 +161,13 @@ def experiment_on_folder(dataset_name, model_name, folder_idx, feature_type,
             if test_preds['score_t'] is None:
                 train_scores, test_scores = get_fitted_scores(train_preds['error_tc'], test_preds['error_tc'])  
             else:
-                train_scores, test_scores = test_preds['score_t'], train_preds['score_t']
+                train_scores, test_scores = train_preds['score_t'], test_preds['score_t']
         test_scores = test_scores[sequence_length-1:]
-        print(f'results of {i+1}st iteration:')
+        print(f'iteration # {i+1}...')
         print('number of test sequences: ', len(x_test))
         # if i==0:
         aps, auroc, acc = get_results(y_test, test_scores, top_k= top_k, print_results=False)
-        results.append(f'\niteration {i+1}: APS={aps:0.3f}, AUROC={auroc:0.3f}, ACC={acc:0.3f}')
+        results.append(f'\niteration {i+1}: APS={aps:0.3f}, AUROC={auroc:0.3f}, ACC={acc:0.3f}, val_loss={best_val_loss:0.5f}')
         if algorithm == 'default':
             break
 
@@ -236,12 +235,13 @@ def run_all_experiments(dataset_name, model_names, distr_name, algorithm, mode):
 if __name__ == '__main__':
     datasets = ['edBB', 'MyDataset']
     feature_types = ['original', 'angle', 'distance', 'angle_distance', 'angle_plus_distance']
-    model_names = ['AutoEncoder', 'LSTMED', 'VAE_LSTM','UnivarAutoEncoder',  'OmniAnoAlgo','MSCRED', 'TcnED', 'PcaRecons', 'RawSignalBaseline']
+    model_names = ['AutoEncoder', 'LSTMED', 'VAE_LSTM','UnivarAutoEncoder','MSCRED', 'TcnED',  'OmniAnoAlgo']#, 'PcaRecons', 'RawSignalBaseline']
     distr_names = ['normalized_error', 'univar_gaussian']#, 'univar_lognormal', 'univar_lognorm_add1_loc0', 'chi']
     thresh_methods = ['top_k_time']#, 'best_f1_test', 'tail_prob']
     algorithms = ['default', 'multipass']
-    dataset_name, model_name, folder_idx, feature_type = datasets[1], model_names[3], 1, feature_types[0]
-    experiment_on_folder(dataset_name, model_name, folder_idx, feature_type=feature_type, score_distr_name=distr_names[0],algorithm=algorithms[0])
+    dataset_name, folder_idx, feature_type = datasets[1], 1, feature_types[0]
+    model_name, distr_name, algo_name = model_names[2], distr_names[1], algorithms[1]
+    experiment_on_folder(dataset_name, model_name, folder_idx, feature_type=feature_type, score_distr_name=distr_name,algorithm=algo_name)
     # experiments_on_dataset(dataset_name, model_name, feature_type, distr_names[1], algorithm='default')
     # experiments_on_dataset(dataset_name, model_name, feature_type, distr_names[1], algorithm='multipass')
     # run_all_experiments(dataset_name,[model_names[0]], distr_names[1], algorithms[0], mode='default')

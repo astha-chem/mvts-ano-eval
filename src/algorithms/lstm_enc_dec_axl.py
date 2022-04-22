@@ -140,7 +140,8 @@ class LSTMED(Algorithm, PyTorchUtils):
         if self.last_best_val_loss is None or self.last_best_val_loss > best_val_loss:                                                                        
             self.last_best_val_loss = best_val_loss
             self.model = trained_model
-            
+        return self.last_best_val_loss
+        
     @torch.no_grad()
     def predict_sequences(self, sequences):
         test_loader = DataLoader(dataset=sequences, batch_size=self.batch_size, drop_last=False, pin_memory=True,
