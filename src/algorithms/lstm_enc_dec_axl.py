@@ -136,11 +136,12 @@ class LSTMED(Algorithm, PyTorchUtils):
             fit_with_early_stopping(train_loader, train_val_loader, self.model, patience=self.patience,
                                     num_epochs=self.num_epochs, lr=self.lr, last_t_only=self.last_t_only,
                                     ret_best_val_loss=True)
-
+        model_changed = False   
         if self.last_best_val_loss is None or self.last_best_val_loss > best_val_loss:                                                                        
             self.last_best_val_loss = best_val_loss
             self.model = trained_model
-        return self.last_best_val_loss
+            model_changed = True
+        return self.last_best_val_loss, model_changed
         
     @torch.no_grad()
     def predict_sequences(self, sequences):

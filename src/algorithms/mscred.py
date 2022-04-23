@@ -149,7 +149,8 @@ class MSCRED(Algorithm, PyTorchUtils):
         train_loader, train_val_loader = get_train_data_loaders(matrices, batch_size=self.batch_size,
             splits=[1 - self.train_val_percentage, self.train_val_percentage], seed=self.seed)
         
-        self.model = MSCREDModule(num_timesteps=self.step_max, attention=True, seed=self.seed, gpu=self.gpu)
+        if self.model is None:
+            self.model = MSCREDModule(num_timesteps=self.step_max, attention=True, seed=self.seed, gpu=self.gpu)
         self.model, train_loss, val_loss, val_reconstr_errors, best_val_loss = \
             fit_with_early_stopping(train_loader, train_val_loader, self.model, patience=self.patience,
                                     num_epochs=self.num_epochs, lr=self.lr, ret_best_val_loss=True)
@@ -157,6 +158,7 @@ class MSCRED(Algorithm, PyTorchUtils):
         self.additional_params["val_loss_per_epoch"] = val_loss
         self.additional_params['val_reconstr_errors'] = val_reconstr_errors        
         self.additional_params["best_val_loss"] = best_val_loss
+        return best_val_loss, True
 
     def get_val_loss(self):
         try:

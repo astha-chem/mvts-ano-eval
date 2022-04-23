@@ -116,9 +116,20 @@ class OmniAnoAlgo(Algorithm, TensorflowUtils):
                     saver.restore()
 
                 metrics_dict = self.trainer.fit_sequences(train_seqs, val_seqs)
-                self.best_val_loss = metrics_dict['best_valid_loss']
+                model_changed = False
+                if self.best_val_loss is None or self.best_val_loss > metrics_dict['best_valid_loss']:
+                    self.best_val_loss = metrics_dict['best_valid_loss']
+                    model_changed = True
+                   
                 train_score, train_z, train_pred_speed = self.predictor.get_score(sequence_to_data(train_seqs, self.config.window_length))
                 self.normal_scores = -np.sum(train_score, axis=1)
+
+        # if model_changed:
+        #     self.model = model
+        #     self.trainer = trainer
+        #     self.predictor = predictor
+
+        return self.best_val_loss, model_changed
 
     def get_val_loss(self):
         return self.best_val_loss
@@ -203,7 +214,7 @@ class ExpConfig(Config):
     bf_search_max = 400.
     bf_search_step_size = 1.
 
-    valid_step_freq = 100
+    valid_step_freq = 5 # 100
     gradient_clip_norm = 10.
 
     early_stop = True  # whether to apply early stop method

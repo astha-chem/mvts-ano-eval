@@ -107,6 +107,19 @@ def partition_label_indecies(labels, seq_len):
     return np.array(sorted(zero_idxs)), np.array(sorted(one_idxs))
 # partition_label_indecies([0,0,0,1,0,1,0,0,0],3)
 
+def test_model(model, x_train,  x_test, score_distr_name):
+    test_preds = model.predict_sequences(x_test)
+    train_preds = model.predict_sequences(x_train)
+    if score_distr_name == 'normalized_error':
+        test_scores = get_normalized_scores(train_preds['error_tc'], test_preds['error_tc'])
+    else:
+        if test_preds['score_t'] is None:
+            train_scores, test_scores = get_fitted_scores(train_preds['error_tc'], test_preds['error_tc'])  
+        else:
+            train_scores, test_scores = train_preds['score_t'], test_preds['score_t']
+    test_scores = test_scores[sequence_length-1:]
+    return test_scores
+
 def experiment_on_folder(dataset_name, model_name, folder_idx, feature_type, 
                         score_distr_name='', thres_method='top_k_time', algorithm='default'):
     print(f'\n\nprocessing folder {folder_idx}...')
@@ -126,59 +139,86 @@ def experiment_on_folder(dataset_name, model_name, folder_idx, feature_type,
     val_ratio = 0.25
     i=0
     x_train = None
-    use_only_new_data = True
+    use_only_new_data = False
     results = []
+    best_loss = None
     while  True:
         n_train = int(len(x_seqs) * train_ratio)
         if x_train is None or use_only_new_data:
             x_train = x_seqs[:n_train]
             y_train = y_seqs[:n_train]
+            x_test = x_seqs[n_train:]
+            y_test = y_seqs[n_train:]
             if i == 0:
+                x_test_all = x_seqs[n_train:]
+                y_test_all = y_seqs[n_train:]
+
+
                 n_train = int(len(x_train) * (1-val_ratio))
                 x_val = x_train[n_train:]
                 y_val = y_train[n_train:]
                 x_train = x_train[:n_train]
                 y_train = y_train[:n_train]
-
+                x_train_all = x_seqs[:n_train]
+                y_train_all = y_seqs[:n_train]
         else:
             x_train = np.concatenate((x_train, x_seqs[:n_train]), axis=0)
             y_train = np.concatenate((y_train, y_seqs[:n_train]), axis=0)
-
-        x_test = x_seqs[n_train:]
-        y_test = y_seqs[n_train:]
-    
 
         if len(x_test) < top_k:
             break
             
 
+        # best_val_loss, model_changed = model.fit_sequences(x_train, x_val)
         best_val_loss = model.fit_sequences(x_train, x_val)
-        test_preds = model.predict_sequences(x_test)
-        train_preds = model.predict_sequences(x_train)
-        if score_distr_name == 'normalized_error':
-            test_scores = get_normalized_scores(train_preds['error_tc'], test_preds['error_tc'])
-        else:
-            if test_preds['score_t'] is None:
-                train_scores, test_scores = get_fitted_scores(train_preds['error_tc'], test_preds['error_tc'])  
-            else:
-                train_scores, test_scores = train_preds['score_t'], test_preds['score_t']
-        test_scores = test_scores[sequence_length-1:]
+        model_changed = False
+        if best_loss is None or best_loss > best_val_loss:
+            best_loss = best_val_loss
+            model_changed = True
+
+        if algorithm == 'default':
+            break
+
+        test_scores = test_model(model, x_train, x_test, score_distr_name)
         print(f'iteration # {i+1}...')
         print('number of test sequences: ', len(x_test))
         # if i==0:
         aps, auroc, acc = get_results(y_test, test_scores, top_k= top_k, print_results=False)
+        if best_val_loss is None:
+            best_val_loss=-1;
         results.append(f'\niteration {i+1}: APS={aps:0.3f}, AUROC={auroc:0.3f}, ACC={acc:0.3f}, val_loss={best_val_loss:0.5f}')
-        if algorithm == 'default':
-            break
 
-        test_idx = np.argsort(test_scores)
-        x_seqs = x_test[test_idx]
-        y_seqs = y_test[test_idx]
+        test_all_scores = test_model(model, x_train, x_test_all, score_distr_name)
+        aps_all, auroc_all, acc_all = get_results(y_test_all, test_all_scores, top_k= top_k, print_results=False)
+        results.append(f'\napplied {i+1}: APS={aps_all:0.3f}, AUROC={auroc_all:0.3f}, ACC={acc_all:0.3f}')
+        
+        
+
+        if model_changed:
+            test_idx = np.argsort(test_scores)
+            x_seqs = x_test[test_idx]
+            y_seqs = y_test[test_idx]
+        else:
+            x_seqs = x_test
+            y_seqs = y_test
 
        
 
         i += 1
     
+    
+    test_preds = model.predict_sequences(x_test_all)
+    train_preds = model.predict_sequences(x_train_all)
+    if score_distr_name == 'normalized_error':
+        test_scores = get_normalized_scores(train_preds['error_tc'], test_preds['error_tc'])
+    else:
+        if test_preds['score_t'] is None:
+            train_scores, test_scores = get_fitted_scores(train_preds['error_tc'], test_preds['error_tc'])  
+        else:
+            train_scores, test_scores = train_preds['score_t'], test_preds['score_t']
+    test_scores = test_scores[sequence_length-1:]
+    aps, auroc, acc = get_results(y_test_all, test_scores, top_k= top_k, print_results=False)
+    results.append(f'\nfinal test : APS={aps:0.3f}, AUROC={auroc:0.3f}, ACC={acc:0.3f}')
     print(*results)
     return aps, auroc, acc
 
@@ -239,8 +279,9 @@ if __name__ == '__main__':
     distr_names = ['normalized_error', 'univar_gaussian']#, 'univar_lognormal', 'univar_lognorm_add1_loc0', 'chi']
     thresh_methods = ['top_k_time']#, 'best_f1_test', 'tail_prob']
     algorithms = ['default', 'multipass']
+    np.random.seed(0)
     dataset_name, folder_idx, feature_type = datasets[1], 1, feature_types[0]
-    model_name, distr_name, algo_name = model_names[2], distr_names[1], algorithms[1]
+    model_name, distr_name, algo_name = model_names[0], distr_names[1], algorithms[1]
     experiment_on_folder(dataset_name, model_name, folder_idx, feature_type=feature_type, score_distr_name=distr_name,algorithm=algo_name)
     # experiments_on_dataset(dataset_name, model_name, feature_type, distr_names[1], algorithm='default')
     # experiments_on_dataset(dataset_name, model_name, feature_type, distr_names[1], algorithm='multipass')

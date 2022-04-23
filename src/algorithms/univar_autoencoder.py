@@ -84,13 +84,15 @@ class UnivarAutoEncoder(Algorithm, PyTorchUtils):
             fit_with_early_stopping(train_loader, train_val_loader, model, patience=params['patience'],
                                     num_epochs=params['num_epochs'], lr=params['lr'], last_t_only=params["last_t_only"],
                                     ret_best_val_loss=True)
+        model_changed = False
         if last_best_val_loss is None or last_best_val_loss > best_val_loss:                                                                        
             last_best_val_loss = best_val_loss
             model = trained_model
+            model_changed = True
         
         model_filename = os.path.join(out_dir, "trained_model_channel_%i" % channel_num)
         torch.save(model, model_filename)
-        return model_filename, channel_num, train_loss, val_loss, val_reconstr_errors, last_best_val_loss
+        return model_filename, channel_num, train_loss, val_loss, val_reconstr_errors, last_best_val_loss, model_changed
 
     def predict_one_channel(self, channel_data, channel_num, starts_discont=np.array([])):
         sequences = get_sub_seqs(channel_data, seq_len=self.sequence_length, stride=1, start_discont=starts_discont)
@@ -162,15 +164,18 @@ class UnivarAutoEncoder(Algorithm, PyTorchUtils):
         # pool.terminate()
         # pool.join()
         # print("results: {}".format(roots[:-1]))
+        any_model_changed = False
         for return_value in results:
-            model_filename, channel_num, train_loss, val_loss, val_reconstr_scores, best_val_loss = return_value
+            model_filename, channel_num, train_loss, val_loss, val_reconstr_scores, best_val_loss, model_changed = return_value
             self.model[channel_num] = torch.load(model_filename)
             self.additional_params["train_loss_per_epoch"].append(train_loss)
             self.additional_params["val_loss_per_epoch"].append(val_loss)
             self.additional_params["val_reconstr_errors"].append(val_reconstr_scores)
             self.additional_params["best_val_loss"].append(best_val_loss)
             self.best_val_loss[channel_num] = best_val_loss
-        return np.sum(self.best_val_loss)
+            if model_changed:
+                any_model_changed = True
+        return np.sum(self.best_val_loss), any_model_changed
 
     def get_val_loss(self):
         try:

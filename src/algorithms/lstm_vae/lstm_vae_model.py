@@ -3,6 +3,7 @@ import numpy as np
 import tensorflow as tf
 import six
 from timeit import default_timer as timer
+tf.random.set_random_seed(0)
 
 """Variational LSTM Autoencoder adapted from https://github.com/Danyleb/Variational-Lstm-Autoencoder"""
 
