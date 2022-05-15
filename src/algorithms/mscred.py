@@ -116,23 +116,6 @@ class MSCRED(Algorithm, PyTorchUtils):
     
     def fit_sequences(self, train_seqs, val_seqs):
 
-        # X.interpolate(inplace=True)
-        # X.bfill(inplace=True)
-        # data = X.values
-        # pca = None
-        # if self.pca_comp is not None:
-        #     pca = PCA(n_components=self.pca_comp, svd_solver='full')
-        # elif self.explained_var is not None:
-        #     pca = PCA(n_components=self.explained_var, svd_solver='full')        
-        # self.additional_params["pca"] = pca
-        # if pca is not None:
-        #     # Project input data on a limited number of principal components
-        #     pca.fit(data)
-        #     self.additional_params["pca_expl_var"] = pca.explained_variance_
-        #     self.additional_params["pca_n_comp"] = pca.n_components_
-        #     data = pca.transform(data)
-        # sequences = get_sub_seqs(data, seq_len=self.sequence_length, stride=self.stride,
-        #                          start_discont=self.train_starts) # n_samp x timesteps x n_dim
         sequences  = np.concatenate((train_seqs, val_seqs), axis=0)
         # create signature matrices
         n_dim = sequences.shape[2]
@@ -149,8 +132,7 @@ class MSCRED(Algorithm, PyTorchUtils):
         train_loader, train_val_loader = get_train_data_loaders(matrices, batch_size=self.batch_size,
             splits=[1 - self.train_val_percentage, self.train_val_percentage], seed=self.seed)
         
-        if self.model is None:
-            self.model = MSCREDModule(num_timesteps=self.step_max, attention=True, seed=self.seed, gpu=self.gpu)
+        self.model = MSCREDModule(num_timesteps=self.step_max, attention=True, seed=self.seed, gpu=self.gpu)
         self.model, train_loss, val_loss, val_reconstr_errors, best_val_loss = \
             fit_with_early_stopping(train_loader, train_val_loader, self.model, patience=self.patience,
                                     num_epochs=self.num_epochs, lr=self.lr, ret_best_val_loss=True)
@@ -158,7 +140,7 @@ class MSCRED(Algorithm, PyTorchUtils):
         self.additional_params["val_loss_per_epoch"] = val_loss
         self.additional_params['val_reconstr_errors'] = val_reconstr_errors        
         self.additional_params["best_val_loss"] = best_val_loss
-        return best_val_loss, True
+        return best_val_loss
 
     def get_val_loss(self):
         try:

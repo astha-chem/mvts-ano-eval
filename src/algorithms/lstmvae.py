@@ -125,22 +125,14 @@ class VAE_LSTM(Algorithm, TensorflowUtils):
     def fit_sequences(self, train_seqs, val_seqs):
 
         with self.device:
-            if self.model is None:
-                model = LSTM_Var_Autoencoder(intermediate_dim=self.intermediate_dim, z_dim=self.z_dim, n_dim=self.n_dim,
+            model = LSTM_Var_Autoencoder(intermediate_dim=self.intermediate_dim, z_dim=self.z_dim, n_dim=self.n_dim,
                                          stateful=self.stateful, model_id=self.model_id)
-                self.last_best_val_loss = None
-            else:
-                model = self.model
+
             train_loss, val_loss, best_val_loss = model.fit(train_seqs, val_seqs, learning_rate=self.lr,
                 batch_size=self.batch_size, num_epochs=self.num_epochs, REG_LAMBDA=self.REG_LAMBDA,
                 grad_clip_norm=self.grad_clip_norm, optimizer_params=self.optimizer_params, verbose=self.verbose,
                                                             patience=self.patience)
-        model_changed = False
-        if self.last_best_val_loss is None or self.last_best_val_loss > best_val_loss:
-            self.model = model
-            self.last_best_val_loss = best_val_loss
-            model_changed = True
-
+        self.model = model
         self.additional_params["train_loss_per_epoch"] = train_loss
         self.additional_params["val_loss_per_epoch"] = val_loss
         self.additional_params["best_val_loss"] = best_val_loss
@@ -159,7 +151,7 @@ class VAE_LSTM(Algorithm, TensorflowUtils):
         recons_error = np.sqrt(recons_error) # n_samp x timesteps x n_dim
         recons_error_laststep = np.squeeze(recons_error[:,-1,:])
         self.additional_params['val_reconstr_errors'] = recons_error_laststep
-        return self.last_best_val_loss, model_changed
+        return best_val_loss
 
     def predict_sequences(self, sequences):
         padding = np.zeros((self.sequence_length-1, sequences.shape[-1]))

@@ -83,20 +83,14 @@ class AutoEncoder(Algorithm, PyTorchUtils):
         train_val_loader = DataLoader(dataset=val_seqs, batch_size=self.batch_size, drop_last=False, pin_memory=True, shuffle=False)
         
             
-        # if self.model is None:                                                                        
         self.model = AutoEncoderModule(train_seqs.shape[-1], self.sequence_length, self.hidden_size, seed=self.seed, gpu=self.gpu)
-        # self.last_best_val_loss = None
 
         self.model, train_loss, val_loss, val_reconstr_errors, best_val_loss = \
             fit_with_early_stopping(train_loader, train_val_loader, self.model, patience=self.patience,
                                     num_epochs=self.num_epochs, lr=self.lr, verbose=True, last_t_only=self.last_t_only,
                                     ret_best_val_loss=True)
-        # self.model = trained_model
-        # model_changed = False
-        # if self.last_best_val_loss is None or self.last_best_val_loss > best_val_loss:                                                                        
-        #     self.last_best_val_loss = best_val_loss
-        #     model_changed = True
-        return best_val_loss #, model_changed
+
+        return best_val_loss 
 
     def get_val_loss(self):
         try:

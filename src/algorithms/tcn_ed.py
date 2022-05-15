@@ -84,19 +84,7 @@ class TcnED(Algorithm, PyTorchUtils):
         self.additional_params["best_val_loss"] = best_val_loss
 
     def fit_sequences(self, train_seqs, val_seqs):
-        # X.interpolate(inplace=True)
-        # X.bfill(inplace=True)
-        # data = X.values
-        # if self.pca_comp is not None:
-        #     # Project input data on a limited number of principal components
-        #     pca = PCA(n_components=self.pca_comp, svd_solver='full')
-        #     pca.fit(data)
-        #     self.additional_params["pca"] = pca
-        #     data = pca.transform(data)
-        # sequences = get_sub_seqs(data, seq_len=self.sequence_length, stride=self.stride)
-        # train_loader, train_val_loader = get_train_data_loaders(sequences, batch_size=self.batch_size,
-        #                                                         splits=[1 - self.train_val_percentage,
-        #                                                                 self.train_val_percentage], seed=self.seed)
+        
         train_loader = DataLoader(dataset=train_seqs, batch_size=self.batch_size, drop_last=False, pin_memory=True, shuffle=False)
         train_val_loader = DataLoader(dataset=val_seqs, batch_size=self.batch_size, drop_last=False, pin_memory=True, shuffle=False)
 
@@ -109,6 +97,7 @@ class TcnED(Algorithm, PyTorchUtils):
         self.additional_params["val_loss_per_epoch"] = val_loss
         self.additional_params['val_reconstr_errors'] = val_reconstr_errors
         self.additional_params["best_val_loss"] = best_val_loss
+        return best_val_loss
 
     def get_val_loss(self):
         try:

@@ -83,11 +83,10 @@ class OmniAnoAlgo(Algorithm, TensorflowUtils):
                 self.best_val_loss = metrics_dict['best_valid_loss']
                 train_score, train_z, train_pred_speed = self.predictor.get_score(data)
                 self.normal_scores = -np.sum(train_score, axis=1)
+                
 
     def fit_sequences(self, train_seqs, val_seqs):
-        # X.interpolate(inplace=True)
-        # X.bfill(inplace=True)
-        # data = X.values
+
         self.config.x_dim = train_seqs.shape[-1]
         tf.reset_default_graph()
         with tf.variable_scope('model') as model_vs:
@@ -116,20 +115,12 @@ class OmniAnoAlgo(Algorithm, TensorflowUtils):
                     saver.restore()
 
                 metrics_dict = self.trainer.fit_sequences(train_seqs, val_seqs)
-                model_changed = False
-                if self.best_val_loss is None or self.best_val_loss > metrics_dict['best_valid_loss']:
-                    self.best_val_loss = metrics_dict['best_valid_loss']
-                    model_changed = True
+                self.best_val_loss = metrics_dict['best_valid_loss']
                    
                 train_score, train_z, train_pred_speed = self.predictor.get_score(sequence_to_data(train_seqs, self.config.window_length))
                 self.normal_scores = -np.sum(train_score, axis=1)
 
-        # if model_changed:
-        #     self.model = model
-        #     self.trainer = trainer
-        #     self.predictor = predictor
-
-        return self.best_val_loss, model_changed
+        return self.best_val_loss
 
     def get_val_loss(self):
         return self.best_val_loss
