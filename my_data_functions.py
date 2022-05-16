@@ -23,7 +23,7 @@ def load_edBB_all(feature_type, body_part, normals_only=True):
 
 def load_data_partial(dataset, folder_idx, feature_type, body_part, train_ratio=0.3, return_filenames=False):
 
-    base_path = './edBB/Side/_data'
+    base_path = './data/edBB'
     if dataset == 'MyDataset':
         base_path = f'./data/MyDataset/{folder_idx:02d}'
         # base_path = glob.glob(base_path)[0]
@@ -37,6 +37,15 @@ def load_data_partial(dataset, folder_idx, feature_type, body_part, train_ratio=
         time_series = time_series.iloc[:,1:]
         if body_part == 'upper':
             time_series = time_series.iloc[:,:22]
+    elif feature_type == 'array':
+        features_path = base_path + f'/array_features/{folder_idx:02d}.csv'
+        if dataset == 'MyDataset':
+            features_path = base_path + f'/array_features.csv'
+        data = pd.read_csv(features_path, header=None)
+        data = data.iloc[:,1:]
+        time_series = data
+        if body_part == 'upper':
+            time_series = time_series.iloc[:, :22]
     else:
         features_path = base_path + f'/angle_distance_features/{folder_idx:02d}.csv'
         if dataset == 'MyDataset':
@@ -128,6 +137,6 @@ def test(dataset, feature_type):
 if __name__ == '__main__':
     # test('MyDataset','distance')
     # x, y = load_edBB_all('original','upper')  
-    x, y = load_data_partial('MyDataset',1,'original','full',1.0) 
+    x, y = load_data_partial('MyDataset',1,'array','full',1.0) 
     print('X:',x.shape,'y:',y.shape)
  

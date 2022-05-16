@@ -121,7 +121,8 @@ def test_model(model, x_train,  x_test, score_distr_name):
     return test_scores
 
 def experiment_on_folder(dataset_name, model_name, folder_idx, feature_type, 
-                        score_distr_name='', thres_method='top_k_time', algorithm='default'):
+                        score_distr_name='', mode='singlepass',pretrained_model=None, thres_method='top_k_time'):
+
     print(f'\n\nprocessing folder {folder_idx}...')
 
     x_data, y_data = load_data_partial(dataset_name, folder_idx, feature_type, body_part, train_ratio=0.0)
@@ -129,11 +130,14 @@ def experiment_on_folder(dataset_name, model_name, folder_idx, feature_type,
     features_dim = x_data.shape[1]
     out_dir=setup_out_dir(dataset_name, model_name, feature_type, folder_idx)
     model = get_model(model_name,features_dim, out_dir=out_dir)
+    if pretrained_model != None:
+        model = pretrained_model
 
     x_seqs = get_sub_seqs(x_data.values, seq_len=sequence_length)
     y_seqs = np.array([1 if sum(y_data.iloc[i:i + sequence_length])>0 else 0 for i in range(len(x_seqs))])
     train_ratio = 0.3
-    top_ratio = 0.2
+    select_ratio = 0.3
+    top_ratio = 0.1
     top_k = int(len(x_seqs) * top_ratio)
     top_k = np.sum(y_seqs)
     val_ratio = 0.2
@@ -142,8 +146,8 @@ def experiment_on_folder(dataset_name, model_name, folder_idx, feature_type,
     results = []
     best_loss = None
     while  True:
-        n_train = int(len(x_seqs) * train_ratio)
         if x_train is None:
+            n_train = int(len(x_seqs) * train_ratio)
             x_train = x_seqs[:n_train]
             y_train = y_seqs[:n_train]
             x_test = x_seqs[n_train:]
@@ -160,6 +164,7 @@ def experiment_on_folder(dataset_name, model_name, folder_idx, feature_type,
             y_train_best = y_seqs[:n_train]
 
         else:
+            n_train = int(len(x_seqs) * select_ratio)
             x_test_best = x_test
             y_test_best = y_test
             x_train_best = x_train
@@ -171,7 +176,7 @@ def experiment_on_folder(dataset_name, model_name, folder_idx, feature_type,
             x_test = x_seqs[n_train:]
             y_test = y_seqs[n_train:]
        
-        if algorithm == 'default':
+        if mode != 'multipass':
             break
         
             
@@ -193,14 +198,9 @@ def experiment_on_folder(dataset_name, model_name, folder_idx, feature_type,
         if len(x_test) < top_k:
             break
 
-
-        if model_changed:
-            test_idx = np.argsort(test_scores)
-            x_seqs = x_test[test_idx]
-            y_seqs = y_test[test_idx]
-        else:
-            x_seqs = x_test
-            y_seqs = y_test
+        test_idx = np.argsort(test_scores)
+        x_seqs = x_test[test_idx]
+        y_seqs = y_test[test_idx]
 
         i += 1
            
@@ -222,10 +222,10 @@ def experiment_on_folder(dataset_name, model_name, folder_idx, feature_type,
     print(*results)
     return aps, auroc, acc
 
-def experiments_on_dataset(dataset_name, model_name, feature_type, distr_name='normalized_error', algorithm='default', edBB_pretrain=False, edBB_finetune=False):
+def experiments_on_dataset(dataset_name, model_name, feature_type, distr_name='normalized_error', mode='singlepass'):
     pretrained_model = None
-    if edBB_pretrain:
-        print('training on edBB...')
+    if mode == 'pretrain':
+        print('pre-training on edBB...')
         x_train, _ = load_edBB_all(feature_type, body_part)
         features_dim = x_train.shape[1]
         pretrained_model = get_model(model_name, features_dim, out_dir=setup_out_dir('edBB',model_name, feature_type))
@@ -238,7 +238,7 @@ def experiments_on_dataset(dataset_name, model_name, feature_type, distr_name='n
     auroc_avg = []
     acc_avg = []
     for folder_idx in range (1, n+1):
-        aps,auroc, acc = experiment_on_folder(dataset_name, model_name, folder_idx, feature_type, distr_name, algorithm=algorithm)
+        aps,auroc, acc = experiment_on_folder(dataset_name, model_name, folder_idx, feature_type, distr_name, mode, pretrained_model)
         aps_avg.append(aps)
         auroc_avg.append(auroc)
         acc_avg.append(acc)
@@ -252,21 +252,14 @@ def experiments_on_dataset(dataset_name, model_name, feature_type, distr_name='n
     return aps_avg, auroc_avg, acc_avg
 
 
-def run_all_experiments(dataset_name, model_names, distr_name, algorithm, mode='train'):
+def run_all_experiments(dataset_name, model_names, distr_name, mode):
     metrics = ['Acc','APS', 'AUROC']
     results = pd.DataFrame(data=np.zeros((len(model_names),len(feature_types)*len(metrics))), 
                             columns=pd.MultiIndex.from_product([feature_types, metrics]), index=model_names)
-    edBB_pretrain = False
-    edBB_finetune = False
-    if mode == 'edBB_pretrain':
-        edBB_pretrain = True
-    elif mode == 'edBB_finetune':
-        edBB_pretrain = True
-        edBB_finetune = True
 
     for  model_name in model_names:
         for feature_name in feature_types:
-            aps, roc, acc = experiments_on_dataset(dataset_name, model_name, feature_name, distr_name, algorithm, edBB_pretrain, edBB_finetune)
+            aps, roc, acc = experiments_on_dataset(dataset_name, model_name, feature_name, distr_name, mode)
             results.loc[model_name, feature_name] = [acc, aps, roc]
     time_now = datetime.utcnow().strftime('%Y_%m_%d_%H_%M_%S')
     results.to_csv(f'./my_results/mvts_results_{time_now}.csv')
@@ -274,14 +267,14 @@ def run_all_experiments(dataset_name, model_names, distr_name, algorithm, mode='
 
 if __name__ == '__main__':
     datasets = ['edBB', 'MyDataset']
-    feature_types = ['original','array', 'angle', 'distance', 'angle_distance']
+    feature_types = ['original','array', 'angle_distance', 'angle', 'distance']
     model_names = ['AutoEncoder', 'LSTMED', 'VAE_LSTM','UnivarAutoEncoder','MSCRED', 'TcnED',  'OmniAnoAlgo']#, 'PcaRecons', 'RawSignalBaseline']
     distr_names = ['normalized_error', 'univar_gaussian']#, 'univar_lognormal', 'univar_lognorm_add1_loc0', 'chi']
     thresh_methods = ['top_k_time']#, 'best_f1_test', 'tail_prob']
-    algorithms = ['default', 'multipass']
+    train_modes = ['singlepass', 'multipass', 'pretrain']
     np.random.seed(0)
     dataset_name, folder_idx, feature_type = datasets[1], 1, feature_types[0]
-    model_name, distr_name, algo_name = model_names[-3], distr_names[1], algorithms[1]
-    # experiment_on_folder(dataset_name, model_name, folder_idx, feature_type=feature_type, score_distr_name=distr_name,algorithm=algo_name)
-    # experiments_on_dataset(dataset_name, model_name, feature_type, distr_name, algorithm=algo_name)
-    run_all_experiments(dataset_name,model_names, distr_name, algorithms[0])
+    model_name, distr_name, mode = model_names[-3], distr_names[1], train_modes[0]
+    # experiment_on_folder(dataset_name, model_name, folder_idx, feature_type=feature_type, score_distr_name=distr_name,mode=mode)
+    # experiments_on_dataset(dataset_name, model_name, feature_type, distr_name, mode)
+    run_all_experiments(dataset_name,model_names, distr_name, mode)
