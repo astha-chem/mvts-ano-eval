@@ -139,7 +139,7 @@ def experiment_on_folder(dataset_name, model_name, folder_idx, feature_type,
     select_ratio = 0.3
     top_ratio = 0.1
     top_k = int(len(x_seqs) * top_ratio)
-    top_k = np.sum(y_seqs)
+    # top_k = np.sum(y_seqs)
     val_ratio = 0.2
     i = 1
     x_train = None
@@ -204,8 +204,11 @@ def experiment_on_folder(dataset_name, model_name, folder_idx, feature_type,
 
         i += 1
            
-    
-    best_val_loss = model.fit_sequences(x_train_best , x_val)
+    if mode != 'pretrain':
+        best_val_loss = model.fit_sequences(x_train_best , x_val)
+    else:
+        best_val_loss = 0.0
+        
     test_preds = model.predict_sequences(x_test_best )
     train_preds = model.predict_sequences(x_train_best )
     if score_distr_name == 'normalized_error':
@@ -274,7 +277,7 @@ if __name__ == '__main__':
     train_modes = ['singlepass', 'multipass', 'pretrain']
     np.random.seed(0)
     dataset_name, folder_idx, feature_type = datasets[1], 1, feature_types[0]
-    model_name, distr_name, mode = model_names[-3], distr_names[1], train_modes[0]
+    model_name, distr_name, mode = model_names[-3], distr_names[1], train_modes[-1]
     # experiment_on_folder(dataset_name, model_name, folder_idx, feature_type=feature_type, score_distr_name=distr_name,mode=mode)
     # experiments_on_dataset(dataset_name, model_name, feature_type, distr_name, mode)
     run_all_experiments(dataset_name,model_names, distr_name, mode)
