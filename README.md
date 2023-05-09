@@ -107,7 +107,7 @@ Put all the datasets in the data/raw/ directory.
 
 ```bash
 git clone https://github.com/astha-chem/mvts-ano-eval.git
-conda create -n mvtsenv python=3.6
+conda create -n mvtsenv python=3.6.8
 source activate mvtsenv
 python3 -m pip3 install --user --upgrade pip
 pip install -r requirements.txt --user
